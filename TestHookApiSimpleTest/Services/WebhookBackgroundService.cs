@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.SignalR;
+using TestHookApiSimpleTest.Controllers;
 using TestHookApiSimpleTest.Models;
 
 namespace TestHookApiSimpleTest.Services
@@ -8,16 +9,16 @@ namespace TestHookApiSimpleTest.Services
     /// </summary>
     public class WebhookBackgroundService : IHostedService, IDisposable
     {
-        private readonly IHubContext<PlanningHub> _hubContext;
+        private readonly IHttpClientFactory _httpClientFactory;
         private Timer _timer;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="WebhookBackgroundService"/> class.
         /// </summary>
-        /// <param name="hubContext">The SignalR hub context.</param>
-        public WebhookBackgroundService(IHubContext<PlanningHub> hubContext)
+        /// <param name="httpClientFactory">The HTTP client factory to create HTTP clients.</param>
+        public WebhookBackgroundService(IHttpClientFactory httpClientFactory)
         {
-            _hubContext = hubContext;
+            _httpClientFactory = httpClientFactory;
         }
 
         /// <summary>
@@ -27,7 +28,7 @@ namespace TestHookApiSimpleTest.Services
         /// <returns>A task that represents the asynchronous operation.</returns>
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            _timer = new Timer(DoWork, null, TimeSpan.Zero, TimeSpan.FromSeconds(55));
+            _timer = new Timer(DoWork, null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
             return Task.CompletedTask;
         }
 
@@ -42,18 +43,24 @@ namespace TestHookApiSimpleTest.Services
                 new SimpleDataForHookTest
                 {
                     // Populate with your test data
-                   MyProperty = 456
+                    MyProperty = 456
                 }
             };
 
-            try
+            var client = _httpClientFactory.CreateClient();
+
+            foreach (var subscriber in EventController.Subscribers.Values)
             {
-                await _hubContext.Clients.All.SendAsync("ReceivePlanningData", payload);
-            }
-            catch (Exception ex)
-            {
-                // Handle exceptions
-                Console.WriteLine($"Error sending data via SignalR: {ex.Message}");
+                try
+                {
+                    var response = await client.PostAsJsonAsync(subscriber, payload);
+                    response.EnsureSuccessStatusCode();
+                }
+                catch (Exception ex)
+                {
+                    // Handle exceptions
+                    Console.WriteLine($"Error sending webhook: {ex.Message}");
+                }
             }
         }
 
