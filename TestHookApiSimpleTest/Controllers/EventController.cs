@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using System.Collections.Concurrent;
+using Microsoft.AspNetCore.SignalR;
 using TestHookApiSimpleTest.Models;
 
 namespace TestHookApiSimpleTest.Controllers
@@ -9,64 +9,42 @@ namespace TestHookApiSimpleTest.Controllers
     public class EventController : ControllerBase
     {
         private readonly IHttpClientFactory _httpClientFactory;
-        public static readonly ConcurrentDictionary<string, string> Subscribers = new();
+        private readonly IHubContext<PlanningHub> _hubContext;
 
-        public EventController(IHttpClientFactory httpClientFactory)
+        public EventController(IHttpClientFactory httpClientFactory, IHubContext<PlanningHub> hubContext)
         {
             _httpClientFactory = httpClientFactory;
+            _hubContext = hubContext;
         }
 
-        /// <summary>
-        /// Send data to subscribers on the planning page
-        /// </summary>
-        /// <param name="payload">The data to be sent to the subscribers</param>
-        /// <returns>Action result indicating the status of the operation</returns>
         [HttpPost("planning")]
         public async Task<IActionResult> SendWebhook([FromBody] IEnumerable<SimpleDataForHookTest> payload)
         {
             return await SendWebhookToSubscribers(payload);
         }
 
-        /// <summary>
-        /// Receive a subscribe request and add the subscriber URL to the list
-        /// </summary>
-        /// <param name="request">The subscription request containing the URL to be subscribed</param>
-        /// <returns>Action result indicating the status of the subscription</returns>
         [HttpPost("subscribe")]
-        public IActionResult Subscribe([FromBody] SubscriptionRequest request)
+        public async Task<IActionResult> Subscribe([FromBody] SubscriptionRequest request)
         {
-            string url = request.Url;
-            if (!Subscribers.ContainsKey(url))
-            {
-                Subscribers[url] = url;
-            }
+            await _hubContext.Clients.All.SendAsync("Subscribe", request.Url);
             return Ok(new { status = "subscribed" });
         }
 
-        /// <summary>
-        /// Receive an unsubscribe request and remove the subscriber URL from the list
-        /// </summary>
-        /// <param name="request">The unsubscription request containing the URL to be unsubscribed</param>
-        /// <returns>Action result indicating the status of the unsubscription</returns>
         [HttpPost("unsubscribe")]
-        public IActionResult Unsubscribe([FromBody] SubscriptionRequest request)
+        public async Task<IActionResult> Unsubscribe([FromBody] SubscriptionRequest request)
         {
-            string url = request.Url;
-            Subscribers.TryRemove(url, out _);
+            await _hubContext.Clients.All.SendAsync("Unsubscribe");
             return Ok(new { status = "unsubscribed" });
         }
 
-        /// <summary>
-        /// Send the payload data to all subscribed URLs
-        /// </summary>
-        /// <param name="payload">The data to be sent to the subscribers</param>
-        /// <returns>Action result indicating the status of the operation</returns>
         private async Task<IActionResult> SendWebhookToSubscribers(IEnumerable<SimpleDataForHookTest> payload)
         {
             try
             {
+                var subscribers = PlanningHub.GetSubscribers();
+
                 var client = _httpClientFactory.CreateClient();
-                foreach (var subscriber in Subscribers.Values)
+                foreach (var subscriber in subscribers)
                 {
                     var response = await client.PostAsJsonAsync(subscriber, payload);
                     response.EnsureSuccessStatusCode();
