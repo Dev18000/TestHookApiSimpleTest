@@ -30,7 +30,7 @@
 - API для подписки на веб-хуки: POST /api/Event/subscribe.
 - API для отписки от веб-хуков: POST /api/Event/unsubscribe.
 - API для отправки данных: POST /api/Event/planning.
-- 
+  
 ## Использование
 
 1. Подпишитесь на веб-хук, отправив POST-запрос на /api/Event/subscribe с телом запроса { "Url": "<ваш URL>" }.
