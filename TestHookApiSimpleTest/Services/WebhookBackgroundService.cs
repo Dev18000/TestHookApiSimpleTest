@@ -21,9 +21,12 @@ namespace TestHookApiSimpleTest.Services
 
         private async void DoWork(object state)
         {
+            Random random = new Random();
+            int randomNumber = random.Next(0, 1000);
+
             var payload = new List<SimpleDataForHookTest>
             {
-                new SimpleDataForHookTest { MyProperty = 456 }
+                new SimpleDataForHookTest { MyProperty = randomNumber }
             };
 
             var client = _httpClientFactory.CreateClient();
