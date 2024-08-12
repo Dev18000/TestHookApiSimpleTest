@@ -1,4 +1,5 @@
 using TestHookApiSimpleTest.Models;
+using TestHookApiSimpleTest.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,7 +8,7 @@ builder.Services.AddSignalR();
 builder.Services.AddHttpClient();
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAllOrigins",
+    options.AddPolicy("AllowAll",
         builder =>
         {
             builder.AllowAnyOrigin()
@@ -17,7 +18,7 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+builder.Services.AddHostedService<WebhookBackgroundService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -32,10 +33,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseRouting();
-app.UseCors("AllowAllOrigins");
+app.UseCors("AllowAll"); // Enable CORS if needed
 app.UseAuthorization();
-
 app.MapControllers();
-app.MapHub<PlanningHub>("/planninghub");
+app.MapHub<PlanningHub>("/planninghub");  // Add SignalR hub mapping
 
 app.Run();

@@ -9,7 +9,6 @@ namespace TestHookApiSimpleTest.Models
 
         public override Task OnConnectedAsync()
         {
-            Subscribers.TryAdd(Context.ConnectionId, Context.ConnectionId);
             Console.WriteLine($"Client connected: {Context.ConnectionId}");
             return base.OnConnectedAsync();
         }
@@ -21,21 +20,23 @@ namespace TestHookApiSimpleTest.Models
             return base.OnDisconnectedAsync(exception);
         }
 
-        public async Task Subscribe()
+        public Task Subscribe(string url)
         {
-            Subscribers.TryAdd(Context.ConnectionId, Context.ConnectionId);
-            Console.WriteLine($"Client subscribed: {Context.ConnectionId}");
+            Subscribers[Context.ConnectionId] = url;
+            Console.WriteLine($"Client subscribed: {Context.ConnectionId} with URL: {url}");
+            return Task.CompletedTask;
         }
 
-        public async Task Unsubscribe()
+        public Task Unsubscribe()
         {
             Subscribers.TryRemove(Context.ConnectionId, out _);
             Console.WriteLine($"Client unsubscribed: {Context.ConnectionId}");
+            return Task.CompletedTask;
         }
 
         public static IReadOnlyCollection<string> GetSubscribers()
         {
-            return Subscribers.Keys.ToList();
+            return Subscribers.Values.ToList();
         }
     }
 }
