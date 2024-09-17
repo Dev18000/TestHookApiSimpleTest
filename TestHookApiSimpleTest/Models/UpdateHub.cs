@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace TestHookApiSimpleTest.Models
 {
-    public class PlanningHub : Hub
+    public class UpdateHub : Hub
     {
         public static readonly ConcurrentDictionary<string, string> Subscribers = new();
 

@@ -36,6 +36,6 @@ app.UseRouting();
 app.UseCors("AllowAll"); // Enable CORS if needed
 app.UseAuthorization();
 app.MapControllers();
-app.MapHub<PlanningHub>("/planninghub");  // Add SignalR hub mapping
+app.MapHub<UpdateHub>("/updateHub");  // Add SignalR hub mapping
 
 app.Run();

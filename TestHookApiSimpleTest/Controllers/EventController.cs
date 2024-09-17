@@ -9,9 +9,9 @@ namespace TestHookApiSimpleTest.Controllers
     public class EventController : ControllerBase
     {
         private readonly IHttpClientFactory _httpClientFactory;
-        private readonly IHubContext<PlanningHub> _hubContext;
+        private readonly IHubContext<UpdateHub> _hubContext;
 
-        public EventController(IHttpClientFactory httpClientFactory, IHubContext<PlanningHub> hubContext)
+        public EventController(IHttpClientFactory httpClientFactory, IHubContext<UpdateHub> hubContext)
         {
             _httpClientFactory = httpClientFactory;
             _hubContext = hubContext;
@@ -41,11 +41,12 @@ namespace TestHookApiSimpleTest.Controllers
         {
             try
             {
-                var subscribers = PlanningHub.GetSubscribers();
-
+                var subscribers = UpdateHub.GetSubscribers();
                 var client = _httpClientFactory.CreateClient();
+
                 foreach (var subscriber in subscribers)
                 {
+                    // Отправляем данные о пользователе, включая возраст
                     var response = await client.PostAsJsonAsync(subscriber, payload);
                     response.EnsureSuccessStatusCode();
                 }
