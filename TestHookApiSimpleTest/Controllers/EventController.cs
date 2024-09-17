@@ -37,6 +37,7 @@ namespace TestHookApiSimpleTest.Controllers
             return Ok(new { status = "unsubscribed" });
         }
 
+        // Sends the webhook payload to all subscribers
         private async Task<IActionResult> SendWebhookToSubscribers(IEnumerable<SimpleDataForHookTest> payload)
         {
             try
@@ -46,7 +47,7 @@ namespace TestHookApiSimpleTest.Controllers
 
                 foreach (var subscriber in subscribers)
                 {
-                    // Отправляем данные о пользователе, включая возраст
+                    // Send the user data, including age
                     var response = await client.PostAsJsonAsync(subscriber, payload);
                     response.EnsureSuccessStatusCode();
                 }
@@ -55,6 +56,7 @@ namespace TestHookApiSimpleTest.Controllers
             }
             catch (Exception ex)
             {
+                // Return an error if the webhook failed
                 return StatusCode(500, new { error = ex.Message });
             }
         }
