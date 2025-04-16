@@ -1,79 +1,101 @@
-﻿using Microsoft.AspNetCore.SignalR;
+﻿using System.Data.SqlClient;
+using Microsoft.AspNetCore.SignalR;
 using TestHookApiSimpleTest.Models;
+using Microsoft.Extensions.Logging;
+using TableDependency.SqlClient;
+using TableDependency.SqlClient.Base.Enums;
+using TableDependency.SqlClient.Base.EventArgs;
 
 namespace TestHookApiSimpleTest.Services
 {
-    /// <summary>
-    /// A background service that periodically sends webhook notifications to subscribers.
-    /// </summary>
     public class WebhookBackgroundService : IHostedService, IDisposable
     {
-        private readonly IHubContext<PlanningHub> _hubContext;
-        private Timer _timer;
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly string _connectionString;
+        private readonly ILogger<WebhookBackgroundService> _logger;
+        private SqlTableDependency<TestTable> _tableDependency;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="WebhookBackgroundService"/> class.
-        /// </summary>
-        /// <param name="hubContext">The SignalR hub context.</param>
-        public WebhookBackgroundService(IHubContext<PlanningHub> hubContext)
+        public WebhookBackgroundService(IHttpClientFactory httpClientFactory, ILogger<WebhookBackgroundService> logger)
         {
-            _hubContext = hubContext;
+            _httpClientFactory = httpClientFactory;
+            _connectionString = ""; // todo your connection string
+            _logger = logger;
         }
 
-        /// <summary>
-        /// Starts the background service and sets up the timer to trigger webhook notifications.
-        /// </summary>
-        /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-        /// <returns>A task that represents the asynchronous operation.</returns>
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            _timer = new Timer(DoWork, null, TimeSpan.Zero, TimeSpan.FromSeconds(55));
+            _logger.LogInformation("Webhook service started using SqlTableDependency.");
+            StartSqlTableDependency();
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Sends webhook notifications to all subscribers.
-        /// </summary>
-        /// <param name="state">The state object (not used).</param>
-        private async void DoWork(object state)
+        private void StartSqlTableDependency()
         {
+            _tableDependency = new SqlTableDependency<TestTable>(_connectionString);
+            _tableDependency.OnChanged += OnTableChanged;
+            _tableDependency.OnError += OnTableDependencyError;
+            _tableDependency.Start();
+        }
+
+        private void OnTableChanged(object sender, RecordChangedEventArgs<TestTable> e)
+        {
+            if (e.ChangeType == ChangeType.None)
+            {
+                return;
+            }
+
+            var changedEntity = e.Entity;
+            var operation = e.ChangeType.ToString().ToUpper();
+
             var payload = new List<SimpleDataForHookTest>
             {
                 new SimpleDataForHookTest
                 {
-                    // Populate with your test data
-                   MyProperty = 456
+                    Name = changedEntity.Name,
+                    Age = changedEntity.Age,
+                    OperationType = operation
                 }
             };
 
-            try
+            // Notify all subscribers
+            NotifySubscribers(payload);
+            _logger.LogInformation($"Operation {operation} detected for entity with ID: {changedEntity.Id}");
+        }
+
+        private void OnTableDependencyError(object sender, TableDependency.SqlClient.Base.EventArgs.ErrorEventArgs e)
+        {
+            _logger.LogError($"SqlTableDependency error: {e.Error.Message}");
+        }
+
+        private async Task NotifySubscribers(List<SimpleDataForHookTest> payload)
+        {
+            var client = _httpClientFactory.CreateClient();
+            var subscribers = UpdateHub.GetSubscribers();
+
+            foreach (var subscriber in subscribers)
             {
-                await _hubContext.Clients.All.SendAsync("ReceivePlanningData", payload);
-            }
-            catch (Exception ex)
-            {
-                // Handle exceptions
-                Console.WriteLine($"Error sending data via SignalR: {ex.Message}");
+                try
+                {
+                    var response = await client.PostAsJsonAsync(subscriber, payload);
+                    response.EnsureSuccessStatusCode();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Error sending webhook: {ex.Message}");
+                }
             }
         }
 
-        /// <summary>
-        /// Stops the background service and disposes of the timer.
-        /// </summary>
-        /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-        /// <returns>A task that represents the asynchronous operation.</returns>
         public Task StopAsync(CancellationToken cancellationToken)
         {
-            _timer?.Change(Timeout.Infinite, 0);
+            _tableDependency?.Stop();
+            _logger.LogInformation("Webhook service stopped.");
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Disposes of the resources used by the background service.
-        /// </summary>
         public void Dispose()
         {
-            _timer?.Dispose();
+            _tableDependency?.Dispose();
         }
     }
 }
